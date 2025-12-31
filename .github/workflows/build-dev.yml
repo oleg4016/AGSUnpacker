@@ -1,32 +1,42 @@
 name: Development Build
 
+# Запуск при пуше в мастер, пулл-реквесте и возможность ручного запуска
 on:
   push:
-    branches: master
+    branches: [ "master" ]
   pull_request:
-    branches: master
+    branches: [ "master" ]
+  workflow_dispatch: # Добавляет кнопку для ручного запуска
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.config }} - ${{ matrix.arch }}
+    runs-on: windows-latest # Используем Windows, так как собираем .exe
+    
     strategy:
       fail-fast: false
       matrix:
         config: [Release, Debug]
         arch: [x64, x86]
-        target: [win]
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Building ${{ matrix.config }}-${{ matrix.target }}-${{ matrix.arch }}
-      shell: bash
-      run: make publish CONFIG=${{ matrix.config }} ARCH=${{ matrix.arch }} TARGET=${{ matrix.target }}
-    - uses: actions/upload-artifact@v4
+
+    # Сборка и публикация напрямую через dotnet (без Makefile)
+    - name: Publish Application
+      run: |
+        dotnet publish ./AGSUnpacker.CLI/AGSUnpacker.CLI.csproj -c ${{ matrix.config }} -r win-${{ matrix.arch }} --self-contained -o ./output/${{ matrix.config }}-${{ matrix.arch }}
+
+    # Загрузка готового артефакта (exe файлов)
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: AGSUnpacker-Dev-${{ matrix.config }}-${{ matrix.target }}-${{ matrix.arch }}
-        path: ${{ github.workspace }}/build/package/*
+        name: AGSUnpacker-${{ matrix.config }}-${{ matrix.arch }}
+        path: ./output/${{ matrix.config }}-${{ matrix.arch }}
         if-no-files-found: error
